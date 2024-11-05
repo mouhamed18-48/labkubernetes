@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data  # Adjust this path according to your environment
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-sql
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS patients (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      first_name VARCHAR(255) DEFAULT NULL,
+      last_name VARCHAR(255) DEFAULT NULL,
+      email VARCHAR(255) DEFAULT NULL,
+      phone VARCHAR(255) DEFAULT NULL,
+      address VARCHAR(255) DEFAULT NULL,
+      diagnosis VARCHAR(255) DEFAULT NULL,
+      image_url VARCHAR(255) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      CONSTRAINT UQ_Patients_Email UNIQUE (email)
+    );
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysqldb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysqldb
+  template:
+    metadata:
+      labels:
+        app: mysqldb
+    spec:
+      containers:
+      - name: mysqldb
+        image: mysql:8.0
+        env:
+          - name: MYSQL_DATABASE
+            value: "dbtest"
+          - name: MYSQL_USER
+            value: "admin"
+          - name: MYSQL_PASSWORD
+            value: "letmein"
+          - name: MYSQL_ROOT_PASSWORD
+            value: "letmein"
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d/
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      - name: init-sql
+        configMap:
+          name: mysql-init-sql
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqldb-service
+spec:
+  type: ClusterIP
+  selector:
+    app: mysqldb
+  ports:
+  - port: 3306
+    targetPort: 3306

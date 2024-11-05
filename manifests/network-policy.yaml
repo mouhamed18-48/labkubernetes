@@ -1,0 +1,18 @@
+apiVersion: networking.manifests.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-mysqldb
+spec:
+  podSelector:
+    matchLabels:
+      app: mysqldb
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: nodeapp
+    ports:
+    - protocol: TCP
+      port: 3306
